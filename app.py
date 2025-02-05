@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QDesktopServices, QIcon
 from PySide6.QtCore import Qt, QDate, QTimer, QUrl, QSettings
+import shlex # For proper command quoting
 
 
 class ImmichGoGUI(QMainWindow):
@@ -93,7 +94,7 @@ class ImmichGoGUI(QMainWindow):
         self.command_update_timer.start(300)
 
         self.settings = QSettings("YourOrganization", "ImmichGoGUI")
-        
+
         # Check for and update (or download) the immich-go binary
         self.update_binary()
 
@@ -101,8 +102,8 @@ class ImmichGoGUI(QMainWindow):
 
     def update_binary(self):
         """
-        Checks whether the immich-go binary exists in the designated folder.
-        If not, informs the user to manually place the binary in that folder.
+        Checks whether the immich-go binary exists in the designated folder and is executable.
+        If not, informs the user.
         """
         binary_folder = os.path.join(os.getcwd(), "immich-go")
         if not os.path.exists(binary_folder):
@@ -113,6 +114,7 @@ class ImmichGoGUI(QMainWindow):
             binary_filename = "immich-go"
         binary_path = os.path.join(binary_folder, binary_filename)
         self.binary_path = binary_path  # Store for later use
+
         if not os.path.exists(binary_path):
             QMessageBox.information(
                 self,
@@ -120,46 +122,63 @@ class ImmichGoGUI(QMainWindow):
                 f"The immich-go binary was not found in:\n{binary_folder}\n\n"
                 "Please download the appropriate binary from the GitHub releases and place it in this folder."
             )
+            return False # Binary not found
+
+        if not os.access(binary_path, os.X_OK):
+            QMessageBox.warning(
+                self,
+                "Binary Not Executable",
+                f"The immich-go binary at:\n{binary_path}\n\nis not executable.\n\n"
+                "Please ensure the binary has execute permissions (e.g., `chmod +x immich-go` on Linux/macOS)."
+            )
+            return False # Binary not executable
+        return True # Binary found and executable
+
 
     def run_command(self, command_parts):
         binary = self.binary_path if hasattr(self, "binary_path") else "./immich-go"
+        # Build the full command list (without extra quoting) for proper argument separation.
         command = [binary] + self.get_config_options() + command_parts
-        cmd_string = " ".join(command)
+        # Also create a single string version for passing to shells.
+        cmd_string = " ".join(shlex.quote(arg) for arg in command)
+        
         try:
             if sys.platform.startswith("win"):
+                # On Windows, use 'start' to open a new Command Prompt that remains open.
                 subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", cmd_string], shell=True)
+            
             elif sys.platform.startswith("darwin"):
-                # On macOS, tell Terminal to run the command and keep the window open.
+                # On macOS, use AppleScript to tell Terminal to run the command and then exec bash.
                 apple_script = f'tell application "Terminal" to do script "{cmd_string}; exec bash"'
                 subprocess.Popen(["osascript", "-e", apple_script])
+            
             else:  # Linux
-                # First try if the TERMINAL env variable is set.
-                terminal = os.environ.get("TERMINAL")
-                if terminal:
-                    if "xterm" in terminal.lower():
-                        subprocess.Popen([terminal, "-hold", "-e", cmd_string])
-                    else:
-                        subprocess.Popen([terminal, "-e", "bash", "-c", f"{cmd_string}; exec bash"])
-                else:
-                    # Try a list of common terminal emulators.
-                    possible_terminals = [
-                        ("gnome-terminal", ["--", "bash", "-c", f"{cmd_string}; exec bash"]),
-                        ("konsole", ["-e", f"bash -c '{cmd_string}; exec bash'"]),
-                        ("xfce4-terminal", ["-e", f"bash -c '{cmd_string}; exec bash'"]),
-                        ("xterm", ["-hold", "-e", cmd_string])
-                    ]
-                    terminal_found = False
-                    for term, args in possible_terminals:
-                        try:
-                            subprocess.Popen([term] + args)
-                            terminal_found = True
-                            break
-                        except FileNotFoundError:
-                            continue
-                    if not terminal_found:
-                        QMessageBox.critical(self, "Error", "No suitable terminal emulator found. Please install one.")
+                # Try several common terminal emulators one-by-one.
+                terminals = [
+                    # For gnome-terminal:
+                    ("gnome-terminal", ["--", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For konsole:
+                    ("konsole", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For xfce4-terminal:
+                    ("xfce4-terminal", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For xterm:
+                    ("xterm", ["-hold", "-e", cmd_string])
+                ]
+                
+                for term, args in terminals:
+                    try:
+                        subprocess.Popen([term] + args)
+                        return  # Successfully launched one terminal emulator; exit the function.
+                    except FileNotFoundError:
+                        continue
+                
+                # If none of the emulators could be launched:
+                QMessageBox.critical(self, "Error", "No suitable terminal emulator found. Please install one.")
+        
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to run command: {e}")
+
+
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
@@ -306,6 +325,7 @@ class ImmichGoGUI(QMainWindow):
         self.untitled_albums_check = QCheckBox("Keep Untitled Albums")
         self.takeout_dry_run_check = QCheckBox("Dry Run Mode")
         self.run_takeout_button = QPushButton("Run Google Takeout")
+        self.run_takeout_button.setEnabled(False) # Initially disabled
 
         def add_form_row(form, widget, tooltip):
             row = QHBoxLayout()
@@ -434,28 +454,30 @@ class ImmichGoGUI(QMainWindow):
         self.album_name_edit = QLineEdit()
         self.create_folder_check = QCheckBox("Create Album from Folders")
         self.dry_run_check = QCheckBox("Dry Run Mode")
-        
+        self.run_local_button = QPushButton("Run Local Upload")
+        self.run_local_button.setEnabled(False) # Initially disabled
+
+
         album_name_row = QHBoxLayout()
         album_name_row.addWidget(self.album_name_edit)
         album_name_row.addWidget(create_info_icon("Specify an album name to upload all media into a single album."))
         album_name_row.addStretch()
         upload_form.addRow("Album Name:", album_name_row)
-        
+
         create_folder_row = QHBoxLayout()
         create_folder_row.addWidget(self.create_folder_check)
         create_folder_row.addWidget(create_info_icon("Create albums in Immich based on the folder structure in the source path."))
         create_folder_row.addStretch()
         upload_form.addRow(create_folder_row)
-        
+
         dry_run_row = QHBoxLayout()
         dry_run_row.addWidget(self.dry_run_check)
         dry_run_row.addWidget(create_info_icon("Simulate the upload without actually transferring files."))
         dry_run_row.addStretch()
         upload_form.addRow(dry_run_row)
-        
+
         upload_group.setLayout(upload_form)
         layout.addWidget(upload_group)
-        self.run_local_button = QPushButton("Run Local Upload")
         layout.addWidget(self.run_local_button)
 
         layout.addStretch()
@@ -471,11 +493,15 @@ class ImmichGoGUI(QMainWindow):
             (self.server_url_edit, r"^https?://.+"),
             (self.api_key_edit, r".+")
         ]
+        is_valid_config = True # Assume valid initially
         for field, pattern in required:
             if not re.match(pattern, field.text()):
                 field.setStyleSheet("border: 1px solid red;")
+                is_valid_config = False # Config is invalid if any field fails validation
             else:
                 field.setStyleSheet("")
+        return is_valid_config # Return validation status
+
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -532,7 +558,9 @@ class ImmichGoGUI(QMainWindow):
         elif current_tab == "Local Upload":
             parts += self.get_local_upload_options()
 
-        command_text = " ".join(parts)
+        # Quote each part for accurate command preview
+        quoted_parts = [shlex.quote(part) for part in parts]
+        command_text = " ".join(quoted_parts)
 
         if not self.server_url_edit.text():
             command_text += "\n\n⚠️ MISSING SERVER URL"
@@ -606,11 +634,13 @@ class ImmichGoGUI(QMainWindow):
                 flag_options.append(f'--file-filter="{exts}"')
 
         if self.album_name_edit.text():
-            flag_options.append(f'--album="{self.album_name_edit.text()}"')
+            album_name = self.album_name_edit.text()
+            flag_options.append(f'--album="{album_name}"') # Quote album name if it contains spaces
         if self.create_folder_check.isChecked():
             flag_options.append("--create-album-folder")
         if self.dry_run_check.isChecked():
             flag_options.append("--dry-run")
+
         source_path = self.local_path_edit.text()
         if source_path:
             options += flag_options
@@ -620,6 +650,7 @@ class ImmichGoGUI(QMainWindow):
         return options
 
     def update_status(self):
+        is_valid_config = self.validate_inputs() # Validate config and get status
         errors = []
         if not self.server_url_edit.text():
             errors.append("Server URL required")
@@ -632,7 +663,11 @@ class ImmichGoGUI(QMainWindow):
         else:
             self.status_indicator.setText("✓ Ready to go!")
             self.status_indicator.setStyleSheet("color: green;")
-        self.validate_inputs()
+
+        # Enable/Disable Run Buttons based on config validity
+        self.run_takeout_button.setEnabled(is_valid_config)
+        self.run_local_button.setEnabled(is_valid_config)
+
 
     def open_github_link(self):
         url = QUrl("https://github.com/simulot/immich-go")
