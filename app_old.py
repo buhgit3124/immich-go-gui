@@ -1,7 +1,6 @@
 import sys
 import os
 import re  # For input validation
-import psutil
 import subprocess  # For running external commands
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
@@ -136,85 +135,49 @@ class ImmichGoGUI(QMainWindow):
         return True # Binary found and executable
 
 
-    def run_command(self, command_parts=None):
-        if command_parts is None:
-            command_parts = []
-
+    def run_command(self, command_parts):
         binary = self.binary_path if hasattr(self, "binary_path") else "./immich-go"
+        # Build the full command list (without extra quoting) for proper argument separation.
         command = [binary] + self.get_config_options() + command_parts
+        # Also create a single string version for passing to shells.
         cmd_string = " ".join(shlex.quote(arg) for arg in command)
-
+        
         try:
-            self.run_local_button.setDisabled(True)  # Disable button while command runs
-            self.run_takeout_button.setDisabled(True)
-
             if sys.platform.startswith("win"):
-                proc = subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", cmd_string], shell=True)
-                self.running_process = proc.pid
-
+                # On Windows, use 'start' to open a new Command Prompt that remains open.
+                subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", cmd_string], shell=True)
+            
             elif sys.platform.startswith("darwin"):
+                # On macOS, use AppleScript to tell Terminal to run the command and then exec bash.
                 apple_script = f'tell application "Terminal" to do script "{cmd_string}; exec bash"'
-                proc = subprocess.Popen(["osascript", "-e", apple_script])
-                self.running_process = proc
-
+                subprocess.Popen(["osascript", "-e", apple_script])
+            
             else:  # Linux
+                # Try several common terminal emulators one-by-one.
                 terminals = [
+                    # For gnome-terminal:
                     ("gnome-terminal", ["--", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For konsole:
                     ("konsole", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For xfce4-terminal:
                     ("xfce4-terminal", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
+                    # For xterm:
                     ("xterm", ["-hold", "-e", cmd_string])
                 ]
-                proc = None
+                
                 for term, args in terminals:
                     try:
-                        proc = subprocess.Popen([term] + args)
-                        break
+                        subprocess.Popen([term] + args)
+                        return  # Successfully launched one terminal emulator; exit the function.
                     except FileNotFoundError:
                         continue
-
-                if proc is None:
-                    QMessageBox.critical(self, "Error", "No suitable terminal emulator found. Please install one.")
-                    self.run_local_button.setDisabled(False)
-                    self.run_takeout_button.setDisabled(False)
-                    return
-
-                self.running_process = proc
-
-            self.check_process_timer = QTimer()
-            self.check_process_timer.timeout.connect(self.check_if_process_running)
-            self.check_process_timer.start(1000)
-
+                
+                # If none of the emulators could be launched:
+                QMessageBox.critical(self, "Error", "No suitable terminal emulator found. Please install one.")
+        
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to run command: {e}")
-            self.run_local_button.setDisabled(False)
-            self.run_takeout_button.setDisabled(False)
-            self.running_process = None
 
-
-    def check_if_process_running(self):
-        still_running = False
-
-        if sys.platform.startswith("win"):
-            # On Windows, check if the stored PID is still running
-            if psutil.pid_exists(self.running_process):
-                still_running = True
-
-        else:
-            # On Linux/macOS, use the Popen object to check process status
-            if hasattr(self.running_process, "poll") and self.running_process.poll() is None:
-                still_running = True
-
-        if still_running:
-            self.status_indicator.setText("⚠️ Please close the Immich-Go terminal window to process more.")
-            self.status_indicator.setStyleSheet("color: orange; font-weight: bold;")
-        else:
-            # Process has finished
-            self.check_process_timer.stop()
-            self.running_process = None
-            self.run_local_button.setDisabled(False)
-            self.run_takeout_button.setDisabled(False)
-            self.status_indicator.setText("✓ Ready to go!")
-            self.status_indicator.setStyleSheet("color: green; font-weight: bold;")
 
 
     def create_menu_bar(self):
