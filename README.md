@@ -9,7 +9,6 @@ Immich-Go GUI is a graphical front-end for immich-go, a tool for managing media 
 
 ![Screenshot](screenshots/screenshot.png)
 ![Screenshot](screenshots/screenshot1.png)
-![Screenshot](screenshots/screenshot2.png)
 
 ## Features
 
