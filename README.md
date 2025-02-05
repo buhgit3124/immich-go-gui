@@ -7,6 +7,7 @@ Immich-Go GUI is a graphical front-end for immich-go, a tool for managing media 
 
 [Immich](https://github.com/immich-app/immich) is a high-performance, self-hosted photo and video backup solution.
 
+![Screenshot](screenshots/screenshot.png)
 ![Screenshot](screenshots/screenshot1.png)
 ![Screenshot](screenshots/screenshot2.png)
 
