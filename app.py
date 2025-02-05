@@ -561,57 +561,62 @@ class ImmichGoGUI(QMainWindow):
 
     def get_google_takeout_options(self):
         options = ["upload", "--google-photos"]
+        flag_options = []  # Temporarily store flag-like options.
+
+        if self.create_albums_check.isChecked():
+            flag_options.append("--create-albums")
+        if self.auto_archive_check.isChecked():
+            flag_options.append("--auto-archive")
+        if self.untitled_albums_check.isChecked():
+            flag_options.append("--keep-untitled-albums")
+        if self.takeout_dry_run_check.isChecked():
+            flag_options.append("--dry-run")
+        if self.missing_json_check.isChecked():
+            flag_options.append("--upload-when-missing-json")
+        if self.album_folder_check.isChecked():
+            flag_options.append("--use-album-folder-as-name")
+        if self.discard_archived_check.isChecked():
+            flag_options.append("--discard-archived")
 
         source_path = self.source_path_edit.text()
         if self.zip_radio.isChecked():
             zip_files = [path.strip() for path in source_path.split(";") if path.strip()]
+            options += flag_options  # Append flag-like options first
             if zip_files:
-                options += zip_files
+                options += zip_files  # Then, append paths.
         elif source_path:
-            options.append(source_path)
-
-        if self.create_albums_check.isChecked():
-            options.append("--create-albums")
-        if self.auto_archive_check.isChecked():
-            options.append("--auto-archive")
-        if self.untitled_albums_check.isChecked():
-            options.append("--keep-untitled-albums")
-        if self.takeout_dry_run_check.isChecked():
-            options.append("--dry-run")
-
-        if self.missing_json_check.isChecked():
-            options.append("--upload-when-missing-json")
-        if self.album_folder_check.isChecked():
-            options.append("--use-album-folder-as-name")
-        if self.discard_archived_check.isChecked():
-            options.append("--discard-archived")
+            options += flag_options  # Append flag-like options first
+            options.append(source_path) #Finally add the path
+        else:
+            options += flag_options #Add the rest of the options at last
 
         return options
 
     def get_local_upload_options(self):
         options = ["upload"]
-
-        source_path = self.local_path_edit.text()
-        if source_path:
-            options.append(source_path)
+        flag_options = []  # Temp
 
         if self.date_check.isChecked():
             start = self.start_date.date().toString("yyyy-MM-dd")
             end = self.end_date.date().toString("yyyy-MM-dd")
-            options.append(f"--date-filter={start},{end}")
-
+            flag_options.append(f"--date-filter={start},{end}")
         if self.type_check.isChecked() and self.type_edit.text():
             exts = self.type_edit.text().replace(" ", "").strip()
             if exts:
-                options.append(f'--file-filter="{exts}"')
+                flag_options.append(f'--file-filter="{exts}"')
 
         if self.album_name_edit.text():
-            options.append(f'--album="{self.album_name_edit.text()}"')
+            flag_options.append(f'--album="{self.album_name_edit.text()}"')
         if self.create_folder_check.isChecked():
-            options.append("--create-album-folder")
+            flag_options.append("--create-album-folder")
         if self.dry_run_check.isChecked():
-            options.append("--dry-run")
-
+            flag_options.append("--dry-run")
+        source_path = self.local_path_edit.text()
+        if source_path:
+            options += flag_options
+            options.append(source_path) # Finally add the Path
+        else:
+            options += flag_options #Add the rest of the options at last
         return options
 
     def update_status(self):
