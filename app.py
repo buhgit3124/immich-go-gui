@@ -2,17 +2,20 @@ import sys
 import os
 import re  # For input validation
 import psutil
+import requests
+import io
 import subprocess  # For running external commands
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QCheckBox, QComboBox, QPushButton, QFileDialog,
     QTextEdit, QTabWidget, QGroupBox, QSpinBox, QDateEdit, QSizePolicy,
-    QScrollArea, QRadioButton, QMessageBox
+    QScrollArea, QRadioButton, QMessageBox, QDialog, QProgressBar
 )
 from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QDesktopServices, QIcon
-from PySide6.QtCore import Qt, QDate, QTimer, QUrl, QSettings
+from PySide6.QtCore import Qt, QDate, QTimer, QUrl, QSettings, QThread, Signal
 import shlex # For proper command quoting
-
+import platform
+import webbrowser
 
 class ImmichGoGUI(QMainWindow):
     def __init__(self):
@@ -101,23 +104,255 @@ class ImmichGoGUI(QMainWindow):
 
         self.load_configuration()
 
+    @staticmethod
+    def get_latest_release_info():
+        """Fetch the latest release information from GitHub."""
+        try:
+            # GitHub API to get the latest release
+            api_url = "https://api.github.com/repos/simulot/immich-go/releases/latest"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            release_data = response.json()
+            
+            # Get the release tag (version)
+            latest_version = release_data['tag_name']
+            
+            return latest_version
+        except Exception as e:
+            print(f"Failed to fetch release information: {e}")
+            return None
+
+    def get_download_url(self, version=None):
+        """Generate the appropriate download URL based on the system."""
+        os_name = sys.platform
+        arch = platform.machine().lower()
+        
+        # Mapping of OS and architecture to download filename
+        download_mapping = {
+            ('win32', 'amd64'): 'immich-go_Windows_x86_64.zip',
+            ('win32', 'x86_64'): 'immich-go_Windows_x86_64.zip',
+            ('win32', 'arm64'): 'immich-go_Windows_arm64.zip',
+            ('darwin', 'x86_64'): 'immich-go_Darwin_x86_64.tar.gz',
+            ('darwin', 'arm64'): 'immich-go_Darwin_arm64.tar.gz',
+            ('linux', 'x86_64'): 'immich-go_Linux_x86_64.tar.gz',
+            ('linux', 'arm64'): 'immich-go_Linux_arm64.tar.gz',
+            ('freebsd', 'x86_64'): 'immich-go_Freebsd_x86_64.tar.gz'
+        }
+        
+        # Normalize some variations
+        if arch in ['x64', 'x86_64']:
+            arch = 'x86_64'
+        
+        key = (os_name, arch)
+        if key in download_mapping:
+            # Use provided version or fetch latest
+            if version is None:
+                version = self.get_latest_release_info() or '0.22.1'
+            
+            filename = download_mapping[key]
+            return f'https://github.com/simulot/immich-go/releases/download/{version}/{filename}'
+        
+        return None
+
     def update_binary(self):
         binary_folder = os.path.abspath(os.path.join(os.getcwd(), "immich-go"))
         if not os.path.exists(binary_folder):
             os.makedirs(binary_folder)
-        
+
         # Determine correct binary name for OS
         binary_filename = "immich-go.exe" if sys.platform.startswith("win") else "immich-go"
         binary_path = os.path.join(binary_folder, binary_filename)
-        self.binary_path = binary_path  # Store absolute path
+        self.binary_path = binary_path
 
-        # Check existence and permissions
+        # Check if binary exists
         if not os.path.exists(binary_path):
-            QMessageBox.information(self, "Binary Missing", f"Download immich-go and place it in:\n{binary_folder}")
-            return False
-        if not os.access(binary_path, os.X_OK) and not sys.platform.startswith("win"):
-            QMessageBox.warning(self, "Permissions", "Ensure immich-go is executable (chmod +x)")
-            return False
+            # Create download progress dialog
+            progress_dialog = QDialog(self)
+            progress_dialog.setWindowTitle("Downloading Immich-Go")
+            progress_dialog.setFixedWidth(400)
+            
+            layout = QVBoxLayout()
+            
+            # Status label
+            status_label = QLabel("Downloading Immich-Go binary...")
+            layout.addWidget(status_label)
+            
+            # Progress bar
+            progress_bar = QProgressBar()
+            progress_bar.setRange(0, 100)
+            layout.addWidget(progress_bar)
+            
+            # Cancel button
+            cancel_button = QPushButton("Cancel")
+            layout.addWidget(cancel_button)
+            
+            progress_dialog.setLayout(layout)
+            
+            # Prevent closing the dialog
+            progress_dialog.setWindowFlags(progress_dialog.windowFlags() & ~Qt.WindowCloseButtonHint)
+            
+            # Thread for download to keep UI responsive
+            class DownloadThread(QThread):
+                download_progress = Signal(int)
+                download_complete = Signal(bytes)
+                download_error = Signal(str)
+                
+                def __init__(self, download_url):
+                    super().__init__()
+                    self.download_url = download_url
+                
+                def run(self):
+                    try:
+                        response = requests.get(self.download_url, stream=True)
+                        response.raise_for_status()
+                        
+                        total_size = int(response.headers.get('content-length', 0))
+                        block_size = 1024  # 1 Kibibyte
+                        downloaded_size = 0
+                        
+                        # Buffer to store downloaded content
+                        content = io.BytesIO()
+                        
+                        for data in response.iter_content(block_size):
+                            downloaded_size += len(data)
+                            content.write(data)
+                            
+                            # Calculate and emit progress
+                            if total_size > 0:
+                                progress = int((downloaded_size / total_size) * 100)
+                                self.download_progress.emit(progress)
+                        
+                        self.download_complete.emit(content.getvalue())
+                    
+                    except Exception as e:
+                        self.download_error.emit(str(e))
+            
+            # Set up download thread
+            try:
+                download_url = self.get_download_url()
+                
+                if not download_url:
+                    raise ValueError("Could not determine download URL for your system")
+                
+                download_thread = DownloadThread(download_url)
+                
+                # Connect signals
+                def update_progress(value):
+                    progress_bar.setValue(value)
+                
+                def handle_download_complete(content):
+                    progress_dialog.accept()
+                    
+                    # Determine extraction method based on file type
+                    try:
+                        if download_url.endswith('.zip'):
+                            import zipfile
+                            with zipfile.ZipFile(io.BytesIO(content)) as z:
+                                # Extract the binary, handling different archive structures
+                                for filename in z.namelist():
+                                    if filename.endswith('immich-go') or filename.endswith('immich-go.exe'):
+                                        with z.open(filename) as source, open(binary_path, 'wb') as target:
+                                            target.write(source.read())
+                                        break
+                        elif download_url.endswith('.tar.gz'):
+                            import tarfile
+                            with tarfile.open(fileobj=io.BytesIO(content), mode='r:gz') as tar:
+                                # Extract the binary, handling different archive structures
+                                for member in tar.getmembers():
+                                    if member.name.endswith('immich-go') or member.name.endswith('immich-go.exe'):
+                                        source = tar.extractfile(member)
+                                        with open(binary_path, 'wb') as target:
+                                            target.write(source.read())
+                                        break
+                        else:
+                            raise ValueError("Unsupported archive type")
+                        
+                        # Set executable permissions for non-Windows systems
+                        if not sys.platform.startswith("win"):
+                            os.chmod(binary_path, 0o755)
+                    
+                    except Exception as extraction_error:
+                        QMessageBox.critical(self, "Extraction Error", 
+                            f"Failed to extract binary: {str(extraction_error)}\n\n"
+                            "Please download manually from GitHub.")
+                
+                def handle_download_error(error):
+                    progress_dialog.reject()
+                    # If download fails, show manual download dialog
+                    error_dialog = QDialog(self)
+                    error_dialog.setWindowTitle("Binary Download Failed")
+                    error_dialog.setFixedWidth(450)
+                    
+                    layout = QVBoxLayout()
+                    
+                    # Error message
+                    error_label = QLabel("Automatic binary download failed")
+                    error_label.setStyleSheet("color: red; font-weight: bold;")
+                    layout.addWidget(error_label)
+                    
+                    # Detailed error information
+                    details_label = QLabel(f"Error: {error}")
+                    details_label.setWordWrap(True)
+                    layout.addWidget(details_label)
+                    
+                    # Manual download instructions
+                    version = self.get_latest_release_info() or "latest"
+                    download_url = "https://github.com/simulot/immich-go/releases/tag/" + version
+                    
+                    instructions_label = QLabel(
+                        "Please download the binary manually:\n\n"
+                        f"1. Visit: {download_url}\n"
+                        f"2. Download the appropriate binary for your system\n"
+                        f"3. Place it in: {binary_folder}\n"
+                        "4. Rename to 'immich-go' (or 'immich-go.exe' on Windows)\n"
+                        "5. Ensure it has executable permissions"
+                    )
+                    instructions_label.setWordWrap(True)
+                    layout.addWidget(instructions_label)
+                    
+                    # URL copy button
+                    url_layout = QHBoxLayout()
+                    url_edit = QLineEdit(download_url)
+                    url_edit.setReadOnly(True)
+                    copy_btn = QPushButton("Copy URL")
+                    copy_btn.clicked.connect(lambda: QApplication.clipboard().setText(download_url))
+                    url_layout.addWidget(url_edit)
+                    url_layout.addWidget(copy_btn)
+                    layout.addLayout(url_layout)
+                    
+                    # Open browser button
+                    open_btn = QPushButton("Open Download Page")
+                    open_btn.clicked.connect(lambda: webbrowser.open(download_url))
+                    layout.addWidget(open_btn)
+                    
+                    error_dialog.setLayout(layout)
+                    error_dialog.exec()
+                
+                # Connect thread signals
+                download_thread.download_progress.connect(update_progress)
+                download_thread.download_complete.connect(handle_download_complete)
+                download_thread.download_error.connect(handle_download_error)
+                
+                # Setup cancel button
+                def cancel_download():
+                    download_thread.terminate()
+                    progress_dialog.reject()
+                
+                cancel_button.clicked.connect(cancel_download)
+                
+                # Start the download
+                progress_dialog.show()
+                download_thread.start()
+                
+                # Block until dialog is closed
+                progress_dialog.exec()
+            
+            except Exception as e:
+                QMessageBox.critical(self, "Download Error", 
+                    f"Failed to initiate download: {str(e)}\n\n"
+                    "Please download manually from GitHub.")
+                return False
+
         return True
 
 
