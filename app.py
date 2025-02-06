@@ -102,70 +102,44 @@ class ImmichGoGUI(QMainWindow):
         self.load_configuration()
 
     def update_binary(self):
-        """
-        Checks whether the immich-go binary exists in the designated folder and is executable.
-        If not, informs the user.
-        """
-        binary_folder = os.path.join(os.getcwd(), "immich-go")
+        binary_folder = os.path.abspath(os.path.join(os.getcwd(), "immich-go"))
         if not os.path.exists(binary_folder):
             os.makedirs(binary_folder)
-        if sys.platform.startswith("win"):
-            binary_filename = "immich-go.exe"
-        else:
-            binary_filename = "immich-go"
+        
+        # Determine correct binary name for OS
+        binary_filename = "immich-go.exe" if sys.platform.startswith("win") else "immich-go"
         binary_path = os.path.join(binary_folder, binary_filename)
-        self.binary_path = binary_path  # Store for later use
+        self.binary_path = binary_path  # Store absolute path
 
+        # Check existence and permissions
         if not os.path.exists(binary_path):
-            QMessageBox.information(
-                self,
-                "Binary Not Found",
-                f"The immich-go binary was not found in:\n{binary_folder}\n\n"
-                "Please download the appropriate binary from the GitHub releases and place it in this folder."
-            )
-            return False # Binary not found
-
-        if not os.access(binary_path, os.X_OK):
-            QMessageBox.warning(
-                self,
-                "Binary Not Executable",
-                f"The immich-go binary at:\n{binary_path}\n\nis not executable.\n\n"
-                "Please ensure the binary has execute permissions (e.g., `chmod +x immich-go` on Linux/macOS)."
-            )
-            return False # Binary not executable
-        return True # Binary found and executable
+            QMessageBox.information(self, "Binary Missing", f"Download immich-go and place it in:\n{binary_folder}")
+            return False
+        if not os.access(binary_path, os.X_OK) and not sys.platform.startswith("win"):
+            QMessageBox.warning(self, "Permissions", "Ensure immich-go is executable (chmod +x)")
+            return False
+        return True
 
 
     def run_command(self, command_parts=None):
         if command_parts is None:
             command_parts = []
 
-        binary = self.binary_path if hasattr(self, 'binary_path') else "./immich-go"
-        
-        # Construct the full command list
-        command = [binary] + self.get_config_options() + command_parts
-        
+        # Ensure binary path is correctly referenced
+        if not hasattr(self, 'binary_path') or not os.path.exists(self.binary_path):
+            if not self.update_binary():  # Check and update binary path
+                QMessageBox.critical(self, "Error", "Immich-Go binary is missing or not executable.")
+                return
+
+        command = [self.binary_path] + self.get_config_options() + command_parts
+
         try:
             self.run_local_button.setDisabled(True)
             self.run_takeout_button.setDisabled(True)
 
             if sys.platform.startswith("win"):
-                # For Windows, construct the command differently
-                # Convert the binary path to use Windows-style backslashes
-                binary = binary.replace('/', '\\')
-                
-                # Build the command string without using shlex.quote
-                cmd_string = f'"{binary}"'  # Quote the binary path
-                
-                # Add the rest of the arguments, quoting only if necessary
-                for arg in self.get_config_options() + command_parts:
-                    if ' ' in arg or any(c in arg for c in '"&|<>^'):
-                        # Quote arguments containing spaces or special characters
-                        cmd_string += f' "{arg}"'
-                    else:
-                        cmd_string += f' {arg}'
-                
-                # Use cmd.exe to open a new window and execute the command
+                # Properly format the command line for Windows
+                cmd_string = subprocess.list2cmdline(command)
                 proc = subprocess.Popen(
                     ['cmd', '/c', 'start', 'cmd', '/k', cmd_string],
                     shell=True,
@@ -174,35 +148,33 @@ class ImmichGoGUI(QMainWindow):
                 self.running_process = proc.pid
 
             elif sys.platform.startswith("darwin"):
-                # MacOS handling remains the same
-                apple_script = f'tell application "Terminal" to do script "{" ".join(shlex.quote(arg) for arg in command)}; exec bash"'
+                # MacOS handling (unchanged)
+                apple_script = f'tell application "Terminal" to do script "{shlex.join(command)}; exec bash"'
                 proc = subprocess.Popen(["osascript", "-e", apple_script])
                 self.running_process = proc
 
             else:  # Linux
-                # Linux handling remains the same
+                # Linux handling (unchanged)
                 terminals = [
-                    ("gnome-terminal", ["--", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
-                    ("konsole", ["-e", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
-                    ("xfce4-terminal", ["-e", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
-                    ("xterm", ["-hold", "-e", " ".join(shlex.quote(arg) for arg in command)])
+                    ("gnome-terminal", "--", "bash", "-c", f"{shlex.join(command)}; exec bash"),
+                    ("konsole", "-e", "bash", "-c", f"{shlex.join(command)}; exec bash"),
+                    ("xfce4-terminal", "-e", "bash", "-c", f"{shlex.join(command)}; exec bash"),
+                    ("xterm", "-hold", "-e", shlex.join(command))
                 ]
-                proc = None
-                for term, args in terminals:
+                for term in terminals:
                     try:
-                        proc = subprocess.Popen([term] + args)
+                        proc = subprocess.Popen(term)
+                        self.running_process = proc
                         break
                     except FileNotFoundError:
                         continue
-
-                if proc is None:
-                    QMessageBox.critical(self, "Error", "No suitable terminal emulator found. Please install one.")
+                else:
+                    QMessageBox.critical(self, "Error", "No suitable terminal emulator found.")
                     self.run_local_button.setDisabled(False)
                     self.run_takeout_button.setDisabled(False)
                     return
 
-                self.running_process = proc
-
+            # Start timer to monitor process
             self.check_process_timer = QTimer()
             self.check_process_timer.timeout.connect(self.check_if_process_running)
             self.check_process_timer.start(1000)
