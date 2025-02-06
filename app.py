@@ -140,29 +140,52 @@ class ImmichGoGUI(QMainWindow):
         if command_parts is None:
             command_parts = []
 
-        binary = self.binary_path if hasattr(self, "binary_path") else "./immich-go"
+        binary = self.binary_path if hasattr(self, 'binary_path') else "./immich-go"
+        
+        # Construct the full command list
         command = [binary] + self.get_config_options() + command_parts
-        cmd_string = " ".join(shlex.quote(arg) for arg in command)
-
+        
         try:
-            self.run_local_button.setDisabled(True)  # Disable button while command runs
+            self.run_local_button.setDisabled(True)
             self.run_takeout_button.setDisabled(True)
 
             if sys.platform.startswith("win"):
-                proc = subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", cmd_string], shell=True)
+                # For Windows, construct the command differently
+                # Convert the binary path to use Windows-style backslashes
+                binary = binary.replace('/', '\\')
+                
+                # Build the command string without using shlex.quote
+                cmd_string = f'"{binary}"'  # Quote the binary path
+                
+                # Add the rest of the arguments, quoting only if necessary
+                for arg in self.get_config_options() + command_parts:
+                    if ' ' in arg or any(c in arg for c in '"&|<>^'):
+                        # Quote arguments containing spaces or special characters
+                        cmd_string += f' "{arg}"'
+                    else:
+                        cmd_string += f' {arg}'
+                
+                # Use cmd.exe to open a new window and execute the command
+                proc = subprocess.Popen(
+                    ['cmd', '/c', 'start', 'cmd', '/k', cmd_string],
+                    shell=True,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
                 self.running_process = proc.pid
 
             elif sys.platform.startswith("darwin"):
-                apple_script = f'tell application "Terminal" to do script "{cmd_string}; exec bash"'
+                # MacOS handling remains the same
+                apple_script = f'tell application "Terminal" to do script "{" ".join(shlex.quote(arg) for arg in command)}; exec bash"'
                 proc = subprocess.Popen(["osascript", "-e", apple_script])
                 self.running_process = proc
 
             else:  # Linux
+                # Linux handling remains the same
                 terminals = [
-                    ("gnome-terminal", ["--", "bash", "-c", f"{cmd_string}; exec bash"]),
-                    ("konsole", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
-                    ("xfce4-terminal", ["-e", "bash", "-c", f"{cmd_string}; exec bash"]),
-                    ("xterm", ["-hold", "-e", cmd_string])
+                    ("gnome-terminal", ["--", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
+                    ("konsole", ["-e", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
+                    ("xfce4-terminal", ["-e", "bash", "-c", f'{" ".join(shlex.quote(arg) for arg in command)}; exec bash']),
+                    ("xterm", ["-hold", "-e", " ".join(shlex.quote(arg) for arg in command)])
                 ]
                 proc = None
                 for term, args in terminals:
