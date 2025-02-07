@@ -12,9 +12,15 @@ Immich-Go GUI is a graphical front-end for immich-go, a tool for managing media 
 
 ## Features
 
-* Cross-platform terminal launching: Launches immich-go in a separate terminal window on Windows, macOS, and Linux.
-* Process tracking and status indicators: Disables run buttons while immich-go is active and displays a prompt asking the user to close the terminal window before starting a new process.
-* Command preview: Displays the constructed immich-go command with the selected configuration options.
+* **Cross-platform terminal launching**: Launches immich-go in a separate terminal window on Windows, macOS, and Linux.
+* **Automatic binary download**: Fetches and installs the latest immich-go release for your system.
+* **Process tracking and status indicators**: Disables run buttons while immich-go is active and displays a prompt asking the user to close the terminal window before starting a new process.
+* **Command preview**: Displays the constructed immich-go command with the selected configuration options.
+* **Google Takeout integration**: Supports uploading Google Takeout photos and videos to Immich.
+* **Local folder uploads**: Select any local directory and filter files by date or extension before uploading.
+* **Advanced settings**: Customize API URLs, logging levels, timeout durations, and other settings.
+* **Configuration saving & loading**: Stores user preferences to streamline repeated usage.
+* **Drag & Drop Support**: Easily add files and directories to the application for processing.
 
 ## Requirements
 
@@ -38,14 +44,7 @@ In the project directory, execute:
 uv run app.py
 ```
 
-### 3. Download Immich-Go Binary
-On the first run, the application creates a folder named "immich-go". Download the latest immich-go binary from the releases section at:
-https://github.com/simulot/immich-go/releases/latest
 
-Then, place the binary in the prompted "immich-go" folder. (On Linux/macOS, ensure the binary has execute permissions if required, for example by running:
-```bash
-chmod +x immich-go
-```
 
 ## Immich-Go Integration
 
@@ -56,6 +55,19 @@ https://github.com/simulot/immich-go/
 
 Contributions are welcome! If you would like to contribute, please open an issue or submit a pull request.
 
+## Support
+
+If you find this project useful and would like to support its development, you can:
+
+### **💖 GitHub Sponsors**
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-donate-pink.svg)](https://github.com/sponsors/shitan198u)
+
+### **☕ Buy Me a Coffee**
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-orange.svg)](https://www.buymeacoffee.com/shivashitan)
+
 ## License
 
 This project is licensed under the MIT License.
+
