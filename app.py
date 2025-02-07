@@ -867,7 +867,7 @@ class ImmichGoGUI(QMainWindow):
         if self.takeout_dry_run_check.isChecked():
             flag_options.append("--dry-run")
         if self.missing_json_check.isChecked():
-            flag_options.append("--upload-when-missing-json")
+            flag_options.append("--upload-when-missing-JSON")
         if self.album_folder_check.isChecked():
             flag_options.append("--use-album-folder-as-name")
         if self.discard_archived_check.isChecked():
