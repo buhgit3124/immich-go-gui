@@ -61,11 +61,11 @@ If you find this project useful and would like to support its development, you c
 
 ### **💖 GitHub Sponsors**
 
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-donate-pink.svg)](https://github.com/sponsors/shitan198u)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-red?style=for-the-badge&logo=github)](https://github.com/sponsors/shitan198u)
 
 ### **☕ Buy Me a Coffee**
 
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-orange.svg)](https://www.buymeacoffee.com/shivashitan)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%F0%9F%8D%BA-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/shivashitan)
 
 ## License
 
