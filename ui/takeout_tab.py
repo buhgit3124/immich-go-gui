@@ -56,13 +56,32 @@ class TakeoutTab(QWidget):
 
         core_group = QGroupBox("Processing Options")
         core_form = QFormLayout()
-        self.create_albums_check = QCheckBox("Create Albums")
-        self.create_albums_check.setChecked(True)
-        self.auto_archive_check = QCheckBox("Auto Archive")
-        self.auto_archive_check.setChecked(True)
-        self.untitled_albums_check = QCheckBox("Keep Untitled Albums")
+        # self.create_albums_check = QCheckBox("Create Albums") # Replaced with --sync-albums
+        # self.create_albums_check.setChecked(True)
+        # self.auto_archive_check = QCheckBox("Auto Archive") # Replaced with --include-archived
+        # self.auto_archive_check.setChecked(True)
+        # self.untitled_albums_check = QCheckBox("Keep Untitled Albums") #Replaced
         self.takeout_dry_run_check = QCheckBox("Dry Run Mode")
         self.run_takeout_button = QPushButton("Run Google Takeout")
+
+        #New options
+        self.include_archived_check = QCheckBox("Include Archived")
+        self.include_archived_check.setChecked(True)
+        self.include_trashed_check = QCheckBox("Include Trashed")
+        self.include_untitled_albums_check = QCheckBox("Include Untitled Albums")
+        self.include_untitled_albums_check.setChecked(True)
+        self.include_unmatched_check = QCheckBox("Include Unmatched")
+        self.from_album_name_edit = QLineEdit()
+        self.partner_shared_album_edit = QLineEdit()
+        self.sync_albums_check = QCheckBox("Sync Albums")
+        self.sync_albums_check.setChecked(True)
+        self.takeout_tag_check = QCheckBox("Takeout Tag")
+        self.takeout_tag_check.setChecked(True)
+        self.people_tag_check = QCheckBox("People Tag")
+        self.people_tag_check.setChecked(True)
+        self.session_tag_check = QCheckBox("Session Tag")
+
+
 
         def add_form_row(form, widget, tooltip):
             row = QHBoxLayout()
@@ -71,29 +90,43 @@ class TakeoutTab(QWidget):
             row.addStretch()
             form.addRow(row)
 
-        add_form_row(core_form, self.create_albums_check, "Create albums in Immich based on Takeout albums.")
-        add_form_row(core_form, self.auto_archive_check, "Automatically archive uploaded assets in Immich.")
-        add_form_row(core_form, self.untitled_albums_check, "Keep albums that have no title (usually event albums).")
+        # add_form_row(core_form, self.create_albums_check, "Create albums in Immich based on Takeout albums.") #Removed
+        # add_form_row(core_form, self.auto_archive_check, "Automatically archive uploaded assets in Immich.") #Removed
+        # add_form_row(core_form, self.untitled_albums_check, "Keep albums that have no title (usually event albums).")#Removed
         add_form_row(core_form, self.takeout_dry_run_check, "Simulate the upload without actually transferring files.")
+        add_form_row(core_form, self.include_archived_check, "Include archived photos.")
+        add_form_row(core_form, self.include_trashed_check, "Include trashed photos.")
+        add_form_row(core_form, self.include_untitled_albums_check, "Include photos from untitled albums.")
+        add_form_row(core_form, self.include_unmatched_check, "Include photos without matching JSON.")
+        add_form_row(core_form, self.sync_albums_check, "Create Immich albums to match Takeout albums.")
+        add_form_row(core_form, self.takeout_tag_check, "Add a takeout tag to uploaded photos.")
+        add_form_row(core_form, self.people_tag_check, "Add people tags based on Takeout data.")
+        add_form_row(core_form, self.session_tag_check, "Add a session tag to uploaded photos.")
+        core_form.addRow("From Album Name:", self.from_album_name_edit)
+        core_form.addRow("Partner Shared Album:", self.partner_shared_album_edit)
+
+
+
         core_group.setLayout(core_form)
         layout.addWidget(core_group)
         layout.addWidget(self.run_takeout_button)
 
-        adv_group = QGroupBox("Advanced Options")
-        adv_group.setObjectName("Advanced Options")
-        adv_group.setCheckable(True)
-        adv_group.setChecked(False)
-        adv_form = QFormLayout()
+        #Remove advanced options
+        # adv_group = QGroupBox("Advanced Options")
+        # adv_group.setObjectName("Advanced Options")
+        # adv_group.setCheckable(True)
+        # adv_group.setChecked(False)
+        # adv_form = QFormLayout()
 
-        self.missing_json_check = QCheckBox("Upload Missing JSON")
-        self.album_folder_check = QCheckBox("Use Album Folder as Name")
-        self.discard_archived_check = QCheckBox("Discard Archived Photos")
+        # self.missing_json_check = QCheckBox("Upload Missing JSON")
+        # self.album_folder_check = QCheckBox("Use Album Folder as Name")
+        # self.discard_archived_check = QCheckBox("Discard Archived Photos")
 
-        add_form_row(adv_form, self.missing_json_check, "Upload JSON files even if corresponding media is missing.")
-        add_form_row(adv_form, self.album_folder_check, "Use the name of the Takeout album folder as the album name in Immich.")
-        add_form_row(adv_form, self.discard_archived_check, "Do not upload photos that are marked as archived in Takeout data.")
-        adv_group.setLayout(adv_form)
-        layout.addWidget(adv_group)
+        # add_form_row(adv_form, self.missing_json_check, "Upload JSON files even if corresponding media is missing.")
+        # add_form_row(adv_form, self.album_folder_check, "Use the name of the Takeout album folder as the album name in Immich.")
+        # add_form_row(adv_form, self.discard_archived_check, "Do not upload photos that are marked as archived in Takeout data.")
+        # adv_group.setLayout(adv_form)
+        # layout.addWidget(adv_group)
 
         # Wrap in a scroll area
         scroll_area = QScrollArea()
@@ -113,13 +146,23 @@ class TakeoutTab(QWidget):
         self.source_path_edit.textChanged.connect(self.emit_update_preview)
 
         # Connect other checkbox/option changes to update preview
-        self.create_albums_check.toggled.connect(self.emit_update_preview)
-        self.auto_archive_check.toggled.connect(self.emit_update_preview)
-        self.untitled_albums_check.toggled.connect(self.emit_update_preview)
+        # self.create_albums_check.toggled.connect(self.emit_update_preview) #Removed
+        # self.auto_archive_check.toggled.connect(self.emit_update_preview) #Removed
+        # self.untitled_albums_check.toggled.connect(self.emit_update_preview) #Removed
         self.takeout_dry_run_check.toggled.connect(self.emit_update_preview)
-        self.missing_json_check.toggled.connect(self.emit_update_preview)
-        self.album_folder_check.toggled.connect(self.emit_update_preview)
-        self.discard_archived_check.toggled.connect(self.emit_update_preview)
+        # self.missing_json_check.toggled.connect(self.emit_update_preview) #Removed
+        # self.album_folder_check.toggled.connect(self.emit_update_preview) #Removed
+        # self.discard_archived_check.toggled.connect(self.emit_update_preview) #Removed
+        self.include_archived_check.toggled.connect(self.emit_update_preview)
+        self.include_trashed_check.toggled.connect(self.emit_update_preview)
+        self.include_untitled_albums_check.toggled.connect(self.emit_update_preview)
+        self.include_unmatched_check.toggled.connect(self.emit_update_preview)
+        self.from_album_name_edit.textChanged.connect(self.emit_update_preview)
+        self.partner_shared_album_edit.textChanged.connect(self.emit_update_preview)
+        self.sync_albums_check.toggled.connect(self.emit_update_preview)
+        self.takeout_tag_check.toggled.connect(self.emit_update_preview)
+        self.people_tag_check.toggled.connect(self.emit_update_preview)
+        self.session_tag_check.toggled.connect(self.emit_update_preview)
 
     def emit_update_preview(self):
         self.update_command_preview_signal.emit()
@@ -171,31 +214,54 @@ class TakeoutTab(QWidget):
         self.folder_radio.setChecked(settings.value("google_takeout_folder_radio", False, type=bool))
         self.update_browse_mode()  # To set the initial browse button text
         self.source_path_edit.setText(settings.value("google_takeout_source_path", ""))
-        self.create_albums_check.setChecked(settings.value("google_takeout_create_albums", True, type=bool))
-        self.auto_archive_check.setChecked(settings.value("google_takeout_auto_archive", True, type=bool))
-        self.untitled_albums_check.setChecked(settings.value("google_takeout_untitled_albums", False, type=bool))
+        # self.create_albums_check.setChecked(settings.value("google_takeout_create_albums", True, type=bool)) #Removed
+        # self.auto_archive_check.setChecked(settings.value("google_takeout_auto_archive", True, type=bool))#Removed
+        # self.untitled_albums_check.setChecked(settings.value("google_takeout_untitled_albums", False, type=bool))#Removed
         self.takeout_dry_run_check.setChecked(settings.value("google_takeout_dry_run", False, type=bool))
-        self.missing_json_check.setChecked(settings.value("google_takeout_missing_json", False, type=bool))
-        self.album_folder_check.setChecked(settings.value("google_takeout_album_folder_name", False, type=bool))
-        self.discard_archived_check.setChecked(settings.value("google_takeout_discard_archived", False, type=bool))
+        # self.missing_json_check.setChecked(settings.value("google_takeout_missing_json", False, type=bool))#Removed
+        # self.album_folder_check.setChecked(settings.value("google_takeout_album_folder_name", False, type=bool))#Removed
+        # self.discard_archived_check.setChecked(settings.value("google_takeout_discard_archived", False, type=bool))#Removed
 
         # Load advanced group checked state
-        adv_group_checked = settings.value("google_takeout_adv_group_checked", False, type=bool)
-        adv_group = self.findChild(QGroupBox, "Advanced Options")
-        if adv_group:
-            adv_group.setChecked(adv_group_checked)
+        # adv_group_checked = settings.value("google_takeout_adv_group_checked", False, type=bool) #Removed
+        # adv_group = self.findChild(QGroupBox, "Advanced Options")
+        # if adv_group:
+        #     adv_group.setChecked(adv_group_checked)
+
+        #New fields
+        self.include_archived_check.setChecked(settings.value("google_takeout_include_archived", True, type=bool))
+        self.include_trashed_check.setChecked(settings.value("google_takeout_include_trashed", False, type=bool))
+        self.include_untitled_albums_check.setChecked(settings.value("google_takeout_include_untitled_albums", True, type=bool))
+        self.include_unmatched_check.setChecked(settings.value("google_takeout_include_unmatched",False,type=bool))
+        self.from_album_name_edit.setText(settings.value("google_takeout_from_album_name", ""))
+        self.partner_shared_album_edit.setText(settings.value("google_takeout_partner_shared_album", ""))
+        self.sync_albums_check.setChecked(settings.value("google_takeout_sync_albums", True, type=bool))
+        self.takeout_tag_check.setChecked(settings.value("google_takeout_takeout_tag", True, type=bool))
+        self.people_tag_check.setChecked(settings.value("google_takeout_people_tag",True,type=bool))
+        self.session_tag_check.setChecked(settings.value("google_takeout_session_tag", False, type=bool))
+
 
     def get_takeout_values(self):
         # Helper method
         return {
             "source_path": self.source_path_edit.text(),
             "zip_mode": self.zip_radio.isChecked(),
-            "create_albums": self.create_albums_check.isChecked(),
-            "auto_archive": self.auto_archive_check.isChecked(),
-            "keep_untitled_albums": self.untitled_albums_check.isChecked(),
+            # "create_albums": self.create_albums_check.isChecked(), #Removed
+            # "auto_archive": self.auto_archive_check.isChecked(),#Removed
+            # "keep_untitled_albums": self.untitled_albums_check.isChecked(),#Removed
             "dry_run": self.takeout_dry_run_check.isChecked(),
-            "upload_missing_json": self.missing_json_check.isChecked(),
-            "use_album_folder_name": self.album_folder_check.isChecked(),
-            "discard_archived": self.discard_archived_check.isChecked(),
-            "adv_group_checked": self.findChild(QGroupBox, "Advanced Options").isChecked()
+            # "upload_missing_json": self.missing_json_check.isChecked(),#Removed
+            # "use_album_folder_name": self.album_folder_check.isChecked(),#Removed
+            # "discard_archived": self.discard_archived_check.isChecked(),#Removed
+            # "adv_group_checked": self.findChild(QGroupBox, "Advanced Options").isChecked()#Removed
+             "include_archived" : self.include_archived_check.isChecked(),
+             "include_trashed" : self.include_trashed_check.isChecked(),
+             "include_untitled_albums" : self.include_untitled_albums_check.isChecked(),
+             "include_unmatched" : self.include_unmatched_check.isChecked(),
+             "from_album_name" : self.from_album_name_edit.text(),
+             "partner_shared_album" : self.partner_shared_album_edit.text(),
+             "sync_albums" : self.sync_albums_check.isChecked(),
+             "takeout_tag" : self.takeout_tag_check.isChecked(),
+             "people_tag" : self.people_tag_check.isChecked(),
+             "session_tag" : self.session_tag_check.isChecked()
         }

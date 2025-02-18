@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import (QWidget, QFormLayout, QLineEdit, QPushButton,
                                QCheckBox, QGroupBox, QVBoxLayout, QLabel,
-                               QHBoxLayout, QFileDialog, QDateEdit, QScrollArea)
+                               QHBoxLayout, QFileDialog, QDateEdit, QScrollArea, QComboBox)
 from PySide6.QtCore import Signal, QDate, Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from utils.ui_helpers import create_info_icon
@@ -92,9 +92,17 @@ class LocalUploadTab(QWidget):
         upload_group = QGroupBox("Upload Options")
         upload_form = QFormLayout()
         self.album_name_edit = QLineEdit()
-        self.create_folder_check = QCheckBox("Create Album from Folders")
         self.dry_run_check = QCheckBox("Dry Run Mode")
         self.run_local_button = QPushButton("Run Local Upload")
+
+        #New fields
+        self.recursive_check = QCheckBox("Recursive")
+        self.recursive_check.setChecked(True)
+        self.date_from_name_check = QCheckBox("Date From Name")
+        self.date_from_name_check.setChecked(True)
+        # self.folder_as_album_combo = QComboBox() # Removed
+        # self.folder_as_album_combo.addItems(["NONE","FOLDER", "PATH"])
+
 
         album_name_row = QHBoxLayout()
         album_name_row.addWidget(self.album_name_edit)
@@ -102,17 +110,16 @@ class LocalUploadTab(QWidget):
         album_name_row.addStretch()
         upload_form.addRow("Album Name:", album_name_row)
 
-        create_folder_row = QHBoxLayout()
-        create_folder_row.addWidget(self.create_folder_check)
-        create_folder_row.addWidget(create_info_icon("Create albums in Immich based on the folder structure in the source path."))
-        create_folder_row.addStretch()
-        upload_form.addRow(create_folder_row)
 
         dry_run_row = QHBoxLayout()
         dry_run_row.addWidget(self.dry_run_check)
         dry_run_row.addWidget(create_info_icon("Simulate the upload without actually transferring files."))
         dry_run_row.addStretch()
         upload_form.addRow(dry_run_row)
+        upload_form.addRow(self.recursive_check)
+        upload_form.addRow(self.date_from_name_check)
+        # upload_form.addRow("Folder as Album",self.folder_as_album_combo) # Removed
+
 
         upload_group.setLayout(upload_form)
         layout.addWidget(upload_group)
@@ -139,8 +146,11 @@ class LocalUploadTab(QWidget):
         self.type_check.toggled.connect(self.emit_update_preview)
         self.type_edit.textChanged.connect(self.emit_update_preview)
         self.album_name_edit.textChanged.connect(self.emit_update_preview)
-        self.create_folder_check.toggled.connect(self.emit_update_preview)
         self.dry_run_check.toggled.connect(self.emit_update_preview)
+        #New signals
+        self.recursive_check.toggled.connect(self.emit_update_preview)
+        self.date_from_name_check.toggled.connect(self.emit_update_preview)
+        # self.folder_as_album_combo.currentIndexChanged.connect(self.emit_update_preview) # Removed
 
     def emit_update_preview(self):
             self.update_command_preview_signal.emit()
@@ -185,8 +195,13 @@ class LocalUploadTab(QWidget):
         self.type_edit.setEnabled(self.type_check.isChecked())  # Enable/disable type edit
         self.type_edit.setText(settings.value("local_upload_type_edit", ""))
         self.album_name_edit.setText(settings.value("local_upload_album_name", ""))
-        self.create_folder_check.setChecked(settings.value("local_upload_create_folder_check", False, type=bool))
         self.dry_run_check.setChecked(settings.value("local_upload_dry_run_check", False, type=bool))
+
+        #New fields
+        self.recursive_check.setChecked(settings.value("local_upload_recursive_check",True,type=bool))
+        self.date_from_name_check.setChecked(settings.value("local_upload_date_from_name_check", True, type=bool))
+        # self.folder_as_album_combo.setCurrentText(settings.value("local_upload_folder_as_album_combo", "NONE")) # Removed
+
 
     def get_local_upload_values(self):
         return {
@@ -197,6 +212,8 @@ class LocalUploadTab(QWidget):
             "type_filter_enabled": self.type_check.isChecked(),
             "file_extensions": self.type_edit.text() if self.type_check.isChecked() else None,
             "album_name": self.album_name_edit.text(),
-            "create_album_from_folder": self.create_folder_check.isChecked(),
             "dry_run": self.dry_run_check.isChecked(),
+            "recursive": self.recursive_check.isChecked(),
+            "date_from_name": self.date_from_name_check.isChecked(),
+            # "folder_as_album": self.folder_as_album_combo.currentText() # Removed
         }

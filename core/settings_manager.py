@@ -20,7 +20,7 @@ class SettingsManager:
             # Special handling for date values
             if key in ("start_date", "end_date") and value is not None:
                 self.settings.setValue(f"local_upload_{key}", QDate.fromString(value, "yyyy-MM-dd"))
-            elif key not in ("start_date", "end_date"):
+            elif key not in ("start_date", "end_date") and key != "folder_as_album": # Remove folder_as_album
                 self.settings.setValue(f"local_upload_{key}", value) #Prefix keys
 
 
