@@ -13,7 +13,7 @@ style>
 
 <div class="warning">
   ⚠️ **Important Notice:** Breaking changes have been introduced in `immich-go` versions v0.23 and above. Please use version v0.22.1 until a fix is posted.
-</div
+</div>
 
 Immich-Go GUI is a graphical front-end for immich-go, a tool for managing media uploads to the Immich server. This GUI simplifies the process of configuring, launching, and monitoring immich-go.
 
