@@ -817,9 +817,10 @@ class ImmichGoGUI(QMainWindow):
             self.update_command_preview()
 
     def update_command_preview(self):
-        parts = [self.binary_path if hasattr(self, "binary_path") else "./immich-go"]
+        parts = [self.binary_path] if hasattr(self, "binary_path") else ["./immich-go"]
         parts += self.get_config_options()
         current_tab = self.tab_widget.tabText(self.tab_widget.currentIndex())
+        
         if current_tab == "Google Takeout":
             parts += self.get_google_takeout_options()
         elif current_tab == "Local Upload":
@@ -855,7 +856,7 @@ class ImmichGoGUI(QMainWindow):
         return options
 
     def get_google_takeout_options(self):
-        options = ["upload", "--google-photos"]
+        options = ["upload", "from-google-photos"]
         flag_options = []  # Temporarily store flag-like options.
 
         if self.create_albums_check.isChecked():
@@ -888,7 +889,7 @@ class ImmichGoGUI(QMainWindow):
         return options
 
     def get_local_upload_options(self):
-        options = ["upload"]
+        options = ["upload", "from-folder"]
         flag_options = []  # Temp
 
         if self.date_check.isChecked():
