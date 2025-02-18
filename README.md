@@ -3,18 +3,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 
-style>
-  .warning {
-    color: red;
-    font-weight: bold;
-    font-size: 1.2em;
-  }
-</style>
-
-<div class="warning">
-  ⚠️ **Important Notice:** Breaking changes have been introduced in `immich-go` versions v0.23 and above. Please use version v0.22.1 until a fix is posted.
-</div>
-
 Immich-Go GUI is a graphical front-end for immich-go, a tool for managing media uploads to the Immich server. This GUI simplifies the process of configuring, launching, and monitoring immich-go.
 
 [Immich](https://github.com/immich-app/immich) is a high-performance, self-hosted photo and video backup solution.
