@@ -1,11 +1,5 @@
-[project]
-name = "immich-go-gui"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.11.8"
-dependencies = [
-    "psutil>=6.1.1",
+ewe
     "pyside6>=6.8.2",
     "requests>=2.32.3",
 ]
+ew
